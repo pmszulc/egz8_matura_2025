@@ -364,7 +364,7 @@ df21_25 %>%
 
 ## Interpretacja
 
-Spróbujmy teraz powiedzieć, co z tych wykresów wynika, a co nie. Nie ma wątpliwości, że wyniki w największych miastach oraz w szkołach niepublicznych są znacznie lepsze. Natomiast czy jest tak dlatego, że poziom nauczenia jest tam wyższy, to zupełnie osobna sprawa. Jeśli to nie jest jasne, polecam Czytelnikowi artykuł o [korelacji i przyczynowości](https://danetyka.com/korelacja-i-przyczynowosc/) (akurat w kontekście wyników egzaminu ósmoklasisty).
+Spróbujmy teraz powiedzieć, co z tych wykresów wynika, a co nie. Nie ma wątpliwości, że wyniki w największych miastach oraz w szkołach niepublicznych są znacznie lepsze. Natomiast czy jest tak dlatego, że poziom nauczenia jest tam wyższy, to zupełnie osobna sprawa. Jeśli to nie jest jasne, polecam Czytelnikowi artykuł o [korelacji i przyczynowości](https://danetyka.com/korelacja-i-przyczynowosc/){target="_blank"} (akurat w kontekście wyników egzaminu ósmoklasisty).
 
 Ponieważ uczniowie w największych miastach różnią się od tych z mniejszych miast już zanim zaczną chodzić do takiej szkoły, to część z obserwowanych różnic między szkołami można wytłumaczyć właśnie tymi wstępnymi różnicami (w dalszej części pokażę, że kluczową cechą może być wykształcenie rodziców). Podobnie, do szkół niepublicznych nie chodzi reprezentatywny dla całej Polski podzbiór uczniów, ale mamy do czynienia z silną selekcją.
 
@@ -544,13 +544,15 @@ df_wykszt %>%
   )
 ```
 
-Zależności z wykształceniem i wieloma innymi cechami zostały zbadanie znacznie obszerniej w [tej analizie](https://danetyka.com/egzamin-osmoklasisty/) (wyniki egzaminu ósmoklasisty z lat 2021-24). Co ciekawe, po uwzględnieniu wykształcenia przestaje mieć znaczenie np. mediana wynagrodzenia w gminie. 
+Zależności z wykształceniem i wieloma innymi cechami zostały zbadanie znacznie obszerniej w [tej analizie](https://danetyka.com/egzamin-osmoklasisty/){target="_blank"} (wyniki egzaminu ósmoklasisty z lat 2021-24). Co ciekawe, po uwzględnieniu wykształcenia przestaje mieć znaczenie np. mediana wynagrodzeń w gminie. 
 
 ## Źródła
 
-* [Wyniki egzaminów](https://mapa.wyniki.edu.pl/MapaEgzaminow/)
-* [Informacje o szkołach, RSPO](https://rspo.gov.pl/zaawansowana)
-* [Wykształcenie, dane z NSP 2021](https://bdl.stat.gov.pl/bdl/dane/podgrup/temat)
+Obliczenia wykonałem w języku R i jeśli ktoś chciałby je powtórzyć, [udostępniam kod](https://github.com/pmszulc/egz8_matura_2025){target="_blank"}.
+
+* [Wyniki egzaminów](https://mapa.wyniki.edu.pl/MapaEgzaminow/){target="_blank"}
+* [Informacje o szkołach, RSPO](https://rspo.gov.pl/zaawansowana){target="_blank"}
+* [Wykształcenie, dane z NSP 2021](https://bdl.stat.gov.pl/bdl/dane/podgrup/temat){target="_blank"}
 
 
 
