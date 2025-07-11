@@ -1,0 +1,558 @@
+---
+title: "Egzamin ósmoklasisty 2025"
+author: "Piotr Szulc"
+format: 
+   html:
+     self-contained: true
+     toc: true
+     toc-title: "Spis treści"
+     author-title: "Autor"
+     css: styl.css
+editor: source
+execute:
+  echo: false
+  message: false
+  warning: false
+---
+
+```{r}
+library("skimr")
+library("readxl")
+library("tidyverse")
+library("scales")
+library("ggrepel")
+library("ggeffects") 
+source("wczytaj_dane.R")
+theme_set(ggpubr::theme_pubr(base_size = 16))
+okabe <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00",
+  "#CC79A7", "#999999", "#000000")
+
+df <- wczytaj_szkoly(2025)
+```
+
+W analizie skupiam się na szkołach i jako podsumowanie egzaminu ósmoklasisty (głównie matematyki) w danej szkole przyjmuję medianę uzyskanych w niej wyników. Można ją interpretować jako "przeciętny wynik szkoły" (lub jak kto woli: wynik przeciętnego ucznia). Jeśli taka mediana wynosi np. 50%, połowa uczniów w takiej szkole napisała gorzej, połowa lepiej.
+
+Biorę pod uwagę tylko szkoły, w których zdawało co najmniej 10 uczniów. To niewiele, natomiast -- i to pierwsza ważna informacja -- w 25% szkół w całej Polsce do egzaminu przystąpiło mniej niż 10 uczniów (a w 55% mniej niż 20). Trzeba pamiętać, że w takich małych grupach jest większa szansa uzyskania ekstremalnych wartości (bardzo niska lub wysoka mediana). Nie chcę jednak odrzucać takich szkół, bo nie uzyskamy wtedy pełnego obrazu (odpadnie bardzo dużo szkół np. na wsiach lub w mniejszych miejscowościach).
+
+Oprócz tego pominąłem szkoły specjalne, integracyjne, dla dorosłych oraz Szkołę w Chmurze. Biorę pod uwagę szkoły publiczne i niepubliczne, choć w niektórych miejscach będę ograniczał się tylko do tych pierwszych.
+
+```{r}
+#| include: false
+# dla N < 5 brak wyników (5,7%)
+# aż 24,6% szkół Z N < 10, 55% szkół z N < 20
+df %>% 
+  drop_na(Pol_N) %>% 
+  summarise(mean(Pol_N < 5), mean(Pol_N < 10), mean(Pol_N < 15), mean(Pol_N < 20))
+```
+
+## Rozrzut przeciętności
+
+Na poniższym wykresie rozkład median dla szkół z języka polskiego. W większości szkół przeciętny wynik znalazł się w przedziale 50-80%, z czego mniej więcej połowa w przedziale 60-70%.
+
+```{r}
+df %>% 
+  filter(Pol_N >= 10) %>%
+  ggplot(aes(Pol_Mediana)) +
+  geom_histogram(col = "white", binwidth = 10, fill = "#56B4E9", boundary = 0) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  #scale_y_continuous(breaks = seq(500, 2500, by = 500)) +
+  labs(title = "Język polski", y = "Liczba szkół", x = "Mediana [%]",
+    caption = "Danetyka.com na podstawie danych CKE") 
+```
+
+Rozkład jest dość wąski, czego należało się spodziewać, bo nie analizujemy pełnego rozkładu wyników (dla każdego ucznia), ale już podsumowanie dla szkół. Mimo to, rozkład wyników z matematyki jest zupełnie inny, o bardzo dużym rozrzucie:
+
+```{r}
+df %>% 
+  filter(Mat_N >= 10) %>%
+  ggplot(aes(Mat_Mediana)) +
+  geom_histogram(col = "white", binwidth = 10, fill = "#56B4E9", boundary = 0) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  #scale_y_continuous(breaks = seq(500, 2500, by = 500)) +
+  labs(title = "Matematyka", y = "Liczba szkół", x = "Mediana [%]",
+    caption = "Danetyka.com na podstawie danych CKE") 
+```
+
+W niektórych szkołach mediana wynosi 20% (czyli połowa uczniów napisała jeszcze gorzej), w innych 80%. Dodam, że ponieważ połowę punktów można było otrzymać za zadania zamknięte z czterema odpowiedziami (jedna poprawna), to strzelając w tej części i nie rozwiązując żadnego zadania otwartego otrzymamy średnio 12,5%.
+
+Można przypuszczać, że za te najwyższe mediany odpowiadają np. szkoły w największych miastach, a za najniższe w najmniejszych -- i jeśli ograniczymy się do jednego miasta, ten rozrzut median nie będzie tak duży. Tak jednak nie jest. Poniżej wyniki dla Łodzi, Poznania i Wrocławia.
+
+```{r}
+#| fig-height: 8
+
+# miasta <- df %>% 
+#   count(Miejscowość, sort = TRUE) %>% 
+#   slice(1:20) %>% 
+#   pull(Miejscowość)
+# df %>% 
+#   filter(Miejscowość %in% miasta) %>% 
+#   filter(Mat_N >= 10) %>%
+#   summarise(
+#     PolMeSD = sqrt(Hmisc::wtd.var(Pol_Mediana, w = Pol_N)),
+#     MatMeSD = sqrt(Hmisc::wtd.var(Mat_Mediana, w = Mat_N)),
+#     szkoły_n = n(), # liczba szkół
+#     Mat_N = mean(Mat_N), # wielkość szkół
+#     .by = Miejscowość
+#   ) %>% 
+#   arrange(desc(MatMeSD)) %>% 
+#   print(n = Inf)
+
+df %>% 
+  filter(Mat_N >= 10, Miejscowość %in% c("Poznań", "Łódź", "Wrocław")) %>%
+  ggplot(aes(Mat_Mediana)) +
+  geom_histogram(col = "white", binwidth = 10, fill = "#56B4E9", boundary = 0) +
+  facet_wrap(vars(Miejscowość), ncol = 1) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  scale_y_continuous(breaks = seq(0, 20, by = 5)) +
+  labs(title = "Matematyka", y = "Liczba szkół", x = "Mediana [%]",
+    caption = "Danetyka.com na podstawie danych CKE") 
+```
+
+Czyli w jednym mieście mamy pełny przekrój szkół. Jeszcze raz podkreślę, że to nie są wyniki uczniów (wtedy nie byłoby to zaskakujące), ale przeciętne dla szkół.
+
+W przypadku języka polskiego wygląda to zupełnie inaczej.
+
+```{r}
+#| fig-height: 8
+
+df %>% 
+  filter(Mat_N >= 10, Miejscowość %in% c("Poznań", "Łódź", "Wrocław")) %>%
+  ggplot(aes(Pol_Mediana)) +
+  geom_histogram(col = "white", binwidth = 10, fill = "#56B4E9", boundary = 0) +
+  facet_wrap(vars(Miejscowość), ncol = 1) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  scale_y_continuous(breaks = seq(0, 40, by = 10)) +
+  labs(title = "Język polski", y = "Liczba szkół", x = "Mediana [%]",
+    caption = "Danetyka.com na podstawie danych CKE")
+```
+
+## Duże i małe miasta
+
+Porównam teraz wyniki w miastach powyżej 500 tys. mieszkańców (Warszawa, Kraków, Łódź, Wrocław, Poznań), poniżej 100 tys. oraz na wsi (gmina wiejska lub obszar wiejski w gminie miejsko-wiejskiej), ale ograniczając się tylko do szkół publicznych. Do miast 100-500 tys. odniosę się później.
+
+```{r}
+df %>% 
+  filter(Publiczność == "Publiczna") %>% 
+  filter(Lokalizacja %in% c("Miasto < 100 tys.", "Miasto > 500 tys.", "Wieś"),
+    Mat_N >= 10) %>%
+  ggplot(aes(Mat_Mediana, fill = Lokalizacja, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  labs(title = "Matematyka, szkoły publiczne",
+    y = "Gęstość", x = "Mediana [%]", fill = "",
+    caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Wieś" = "#0072B2",
+    "Miasto < 100 tys." = "#56B4E9", "Miasto > 500 tys." = "#009E73")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+Zamiast histogramów (które byłyby nieczytelne w takich porównaniach) prezentuję wykresy gęstości (ważone liczbą zdających). Jeśli Czytelnik nie zna tego rodzaju wykresu, to można na niego spojrzeć jak na "wygładzony" histogram, dodatkowo skalowany tak, że pole pod wykresem (dla każdej grupy) jest takie samo. Z tego powodu każda z grup zajmuje tyle samo miejsca, mimo że szkół w największych miast jest mniej (ok. 5% wszystkich, choć stanowi to 9% uczniów piszących egzamin, bo są to zwykle większe szkoły). Wartości na osi Y w takich wykresach nie mają żadnej praktycznej interpretacji (są skalowane tak, by pole pod wykresem dla każdej grupy wynosiło 1), dlatego ich nie pokazuję. Dodatkowo wyniki na krańcach osi X nie są interpretowalne, w szczególności nie ma żadnej szkoły z medianą 100% (jest to "artefakt" wykresu gęstości).
+
+Jak widać na wykresie, rozkłady dla szkół na wsiach i w miastach poniżej 100 tys. mieszkańców praktycznie pokrywają się, natomiast w największych miastach wyniki są kompletnie inne. 
+
+```{r}
+#| include: false
+df %>% 
+  filter(Publiczność == "Publiczna") %>% # bez ograniczenia Mat_N
+  drop_na(Mat_N) %>%
+  group_by(Lokalizacja) %>% 
+  summarise(n = sum(Mat_N), n_szk = n()) %>% 
+  mutate(n / sum(n) * 100, n_szk / sum(n_szk) * 100)
+df %>% 
+  filter(Publiczność == "Publiczna") %>% 
+  filter(Lokalizacja %in% "Miasto > 500 tys.", Mat_N >= 10) %>%
+  count(Mat_Mediana) %>% 
+  tail()
+
+df %>% 
+  filter(Lokalizacja %in% "Miasto < 100 tys.", Mat_N >= 10) %>%
+  summarise(mean(Mat_Mediana >= 70) * 100, .by = Publiczność)
+
+df %>% 
+  drop_na(Mat_N) %>% 
+  group_by(Lokalizacja, Publiczność) %>% # bez ograniczenia Mat_N
+  summarise(n = sum(Mat_N), n_szk = n()) %>% 
+  mutate(n / sum(n) * 100, n_szk / sum(n_szk) * 100)
+```
+
+## Szkoły niepubliczne
+
+A czy są szkoły w miastach poniżej 100 tys. mieszkańców o wynikach zbliżonych do tych z największych miast? Tak: szkoły niepubliczne. Medianę co najmniej 70% uzyskano w 47% szkół niepublicznych, a jedynie w 6% szkół publicznych.
+
+```{r}
+df %>% 
+  filter(Lokalizacja %in% c("Miasto < 100 tys."), Mat_N >= 10) %>% 
+  mutate(Publiczność = fct_relevel(Publiczność, "Publiczna")) %>%
+  ggplot(aes(Mat_Mediana, fill = Publiczność, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  labs(y = "Gęstość", x = "Mediana [%]", 
+    title = "Matematyka, miasta < 100 tys. mieszkańców",
+    fill = "Szkoła", caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Publiczna" = "#999999", "Niepubliczna" = "#D55E00")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+Oczywiście szkół niepublicznych jest znacznie mniej: 13%, a liczba zdających egzamin w takich szkołach to ok. 5% (w miastach poniżej 100 tys. mieszkańców). Oprócz tego z tego wykresu NIE WYNIKA, że poziom nauczana w szkołach niepublicznych jest wyższych. Do niełatwej interpretacji tych danych przejdę w dalszej części.
+
+Poniżej wyniki dla grup, które pominąłem wyżej.
+
+```{r}
+df %>%
+  filter(Publiczność == "Publiczna") %>%
+  filter(Mat_N >= 10) %>%
+  ggplot(aes(Mat_Mediana, fill = Lokalizacja, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  labs(title = "Matematyka, szkoły publiczne",
+    y = "Gęstość", x = "Mediana [%]", fill = "",
+    caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Wieś" = "#0072B2",
+    "Miasto < 100 tys." = "#56B4E9", "Miasto 100-500 tys." = "grey80",
+    "Miasto > 500 tys." = "#009E73")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+Wyniki dla miast 100-500 tys. znajdują się "pomiędzy" największymi i najmniejszymi miastach, choć ich rozkład jest bardzo szeroki, czyli znajdziemy zarówno szkoły z wynikami lepszymi od tych z największych miast, jak i gorszymi od tych z najmniejszych (i nie będą to wyjątki).
+
+Poniżej podział na szkoły publiczne i niepubliczne dla wszystkich kategorii miast.
+
+```{r}
+#| fig-height: 8
+
+df %>% 
+  filter(Lokalizacja %in% c("Miasto < 100 tys.", "Miasto 100-500 tys.", 
+    "Miasto > 500 tys."), Mat_N >= 10) %>% 
+  mutate(Publiczność = fct_relevel(Publiczność, "Publiczna")) %>%
+  ggplot(aes(Mat_Mediana, fill = Publiczność, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  facet_wrap(vars(Lokalizacja), ncol = 1) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  labs(y = "Gęstość", x = "Mediana [%]",
+    fill = "Szkoła", caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Publiczna" = "#999999", "Niepubliczna" = "#D55E00")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+Lepsze wyniki w szkołach niepublicznych są niezależne od wielkości miasta. W największych jest parę szkół z niższymi wynikami, są to między innymi szkoły sportowe.
+
+```{r}
+#| include: false
+df %>% 
+  filter(Lokalizacja %in% "Miasto > 500 tys.", Mat_N >= 10) %>% 
+  filter(Publiczność == "Niepubliczna", Mat_Mediana > 30, Mat_Mediana < 60) %>% 
+  select(Nazwa, Mat_N, Mat_Mediana) %>% 
+  arrange(Mat_Mediana)
+```
+
+## W poprzednich latach też tak było
+
+Taka sytuacja to nie jest wyjątek akurat w tym roku. Poniżej te same wykresy dla egzaminu z matematyki z lat 2021-25.
+
+```{r}
+#| fig-height: 8
+
+rok2021 <- wczytaj_szkoly(2021)
+rok2022 <- wczytaj_szkoly(2022)
+rok2023 <- wczytaj_szkoly(2023)
+rok2024 <- wczytaj_szkoly(2024)
+df21_25 <- bind_rows(rok2021, rok2022, rok2023, rok2024, df)
+
+df21_25 %>% 
+  filter(Publiczność == "Publiczna") %>% 
+  filter(Lokalizacja %in% c("Miasto < 100 tys.", "Miasto > 500 tys.", "Wieś"),
+    Mat_N >= 10) %>%
+  ggplot(aes(Mat_Mediana, fill = Lokalizacja, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  facet_wrap(vars(Rok), ncol = 2) +
+  scale_x_continuous(breaks = seq(0, 100, by = 20), limits = c(0, 100)) +
+  labs(title = "Matematyka, szkoły publiczne",
+    y = "Gęstość", x = "Mediana [%]", fill = "",
+    caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Wieś" = "#0072B2",
+    "Miasto < 100 tys." = "#56B4E9", "Miasto > 500 tys." = "#009E73")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+```{r}
+#| fig-height: 8
+
+df21_25 %>% 
+  filter(Lokalizacja %in% c("Miasto < 100 tys."), Mat_N >= 10) %>% 
+  mutate(Publiczność = fct_relevel(Publiczność, "Publiczna")) %>%
+  ggplot(aes(Mat_Mediana, fill = Publiczność, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  facet_wrap(vars(Rok), ncol = 2) +
+  scale_x_continuous(breaks = seq(0, 100, by = 20), limits = c(0, 100)) +
+  labs(y = "Gęstość", x = "Mediana [%]", title = "Miasta < 100 tys. mieszkańców",
+    fill = "Szkoła", caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Publiczna" = "#999999", "Niepubliczna" = "#D55E00")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+```{r}
+#| fig-height: 8
+
+df21_25 %>% 
+  filter(Lokalizacja %in% c("Miasto 100-500 tys."), Mat_N >= 10) %>% 
+  mutate(Publiczność = fct_relevel(Publiczność, "Publiczna")) %>%
+  ggplot(aes(Mat_Mediana, fill = Publiczność, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  facet_wrap(vars(Rok), ncol = 2) +
+  scale_x_continuous(breaks = seq(0, 100, by = 20), limits = c(0, 100)) +
+  labs(y = "Gęstość", x = "Mediana [%]", title = "Miasta 100-500 tys. mieszkańców",
+    fill = "Szkoła", caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Publiczna" = "#999999", "Niepubliczna" = "#D55E00")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+```{r}
+#| fig-height: 8
+
+df21_25 %>% 
+  filter(Lokalizacja %in% c("Miasto > 500 tys."), Mat_N >= 10) %>% 
+  mutate(Publiczność = fct_relevel(Publiczność, "Publiczna")) %>%
+  ggplot(aes(Mat_Mediana, fill = Publiczność, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  facet_wrap(vars(Rok), ncol = 2) +
+  scale_x_continuous(breaks = seq(0, 100, by = 20), limits = c(0, 100)) +
+  labs(y = "Gęstość", x = "Mediana [%]", title = "Miasta > 500 tys. mieszkańców",
+    fill = "Szkoła", caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Publiczna" = "#999999", "Niepubliczna" = "#D55E00")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+## Interpretacja
+
+Spróbujmy teraz powiedzieć, co z tych wykresów wynika, a co nie. Nie ma wątpliwości, że wyniki w największych miastach oraz w szkołach niepublicznych są znacznie lepsze. Natomiast czy jest tak dlatego, że poziom nauczenia jest tam wyższy, to zupełnie osobna sprawa. Jeśli to nie jest jasne, polecam Czytelnikowi artykuł o [korelacji i przyczynowości](https://danetyka.com/korelacja-i-przyczynowosc/) (akurat w kontekście wyników egzaminu ósmoklasisty).
+
+Ponieważ uczniowie w największych miastach różnią się od tych z mniejszych miast już zanim zaczną chodzić do takiej szkoły, to część z obserwowanych różnic między szkołami można wytłumaczyć właśnie tymi wstępnymi różnicami (w dalszej części pokażę, że kluczową cechą może być wykształcenie rodziców). Podobnie, do szkół niepublicznych nie chodzi reprezentatywny dla całej Polski podzbiór uczniów, ale mamy do czynienia z silną selekcją.
+
+Z drugiej strony, poza poziomem szkoły (kadry nauczycielskiej) istotny jest poziom, jaki średnio reprezentują uczniowie w szkole/klasie. To po pierwsze ułatwia naukę, po drugie przyciąga coraz lepszych nauczycieli. W takim razie można się spodziewać, że jednak za część tych różnic albo już teraz odpowiada szkoła, albo będzie tak w przyszłości. Osobiście interpretuję te wykresy jako pokazujące pewien trend: prognozę, jak może wyglądać edukacja za parę lat.
+
+Spróbuję teraz uzasadnić, dlaczego taka prosta interpretacja tych zależności jest niepoprawna i pokazać, jak duże znacznie ma wykształcenie rodziców.
+
+## Matura 2025 vs. egzamin ósmoklasisty 2021
+
+```{r}
+#| include: false
+
+egz8 <- rok2021 %>% 
+  mutate(Kod = str_sub(Kod, 1, 6)) %>% 
+  drop_na(Mat_Średnia, Mat_N) %>% 
+  summarise(Mat_egz8 = weighted.mean(Mat_Średnia, w = Mat_N), .by = Kod)
+
+wyniki <- matura %>% 
+  inner_join(egz8, by = "Kod")
+wyniki %>% summarise(r = cor(Mat_egz8, Mat_matura))
+```
+
+Na poniższym wykresie zestawiłem średni wynik egzaminu ósmoklasisty z 2021 roku (oś X) ze średnim wynikiem matury z 2025 roku (oś Y) w danym mieście. Tym razem analizuję średnie, nie mediany, bo mają lepsze własności przy podsumowaniu wyników z wielu szkół (średnia z całego miasta). Rozmiar punktu jest proporcjonalny do liczby zdających. Wziąłem akurat takie lata, bo uczniowie zdający egzamin ósmoklasisty w 2021 to mniej więcej te same osoby, który zdawały maturę w 2025 (oczywiście jest to przybliżenie, w szczególności część uczniów mogła pisać maturę w innymi mieście; oprócz tego w przypadku techników należałoby wziąć wyniki z 2020 roku).
+
+```{r}
+#| fig-height: 6
+
+wyniki %>% 
+  ggplot(aes(Mat_egz8, Mat_matura)) + 
+  geom_point(aes(size = N)) +
+  geom_smooth(method = "lm", se = FALSE, col = "red", linewidth = 1.2, 
+    fullrange = TRUE) +
+  labs(title = "Matematyka, miasta powyżej 100 tys. mieszk.",
+    x = "Egzamin ósmoklasisty 2021, średnia [%]", 
+    y = "Matura 2025, średnia [%]",
+    caption = "Danetyka.com na podstawie danych CKE") +
+  scale_x_continuous(limits = c(NA, 65), breaks = seq(30, 80, by = 5)) +
+  scale_y_continuous(limits = c(NA, 75), breaks = seq(50, 80, by = 5)) +
+  annotate("text", x = 60, y = 56.2, label = "r = 0,87",
+    size = 7, col = "grey30") +
+  theme(
+    legend.position = "none",
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid.major = element_line(color = "gray90", linewidth = 0.3)
+  ) +
+  geom_text_repel(
+    aes(label = Gmina),
+    arrow = arrow(length = unit(0.015, "npc")),
+    point.padding = 0.5,
+    box.padding = 1.5,
+    segment.size = 0.6,
+    segment.color = "grey50",
+    data = wyniki %>% filter(Gmina %in% 
+      c("Warszawa", "Kraków", "Łódź", "Wrocław", "Poznań", "Wałbrzych",
+        "Bytom", "Katowice","Częstochowa", "Bydgoszcz", "Szczecin",
+        "Gdańsk", "Rzeszów"))
+  )
+# ggsave("mat_vs_egz8.png", dpi = 300, bg = "white", width = 7, height = 7)
+```
+
+Korelacja jest bardzo duża (0,87), czyli średni wyniki egzaminu ósmoklasisty w danym mieście jest bardzo podobny do średniego wyniki matury. A mówimy tu przecież o zupełnie innych szkołach (podstawowe i licea/technika). Gdyby za wyniki uczniów odpowiadała głównie szkoła, korelacja między nimi powinna być znacznie niższa.
+
+```{r}
+#| include: false
+
+wyniki_wykszt <- wyniki %>% 
+  left_join(wykszt, by = "Kod")
+  
+wyniki_wykszt %>% 
+  summarise(cor(Mat_egz8, Wykszt_wyższe), cor(Mat_matura, Wykszt_wyższe))
+```
+
+Na kolejnym wykresie korelacja między procentem mieszkańców z wykształceniem wyższym a średnim wynikiem egzaminu ósmoklasisty w danym mieście.
+
+```{r}
+#| fig-height: 5.5
+
+wyniki_wykszt %>% 
+  ggplot(aes(Wykszt_wyższe, Mat_egz8)) + 
+  geom_point(aes(size = N)) +
+  geom_smooth(method = "lm", se = FALSE, col = "red", linewidth = 1.2, 
+    fullrange = TRUE) +
+  labs(title = "Matematyka, miasta powyżej 100 tys. mieszk.",
+    x = "Procent mieszkańców z wykształceniem wyższym", 
+    caption = "Danetyka.com na podstawie danych CKE",
+    y = "Egzamin ósmoklasisty 2021, średnia [%]") +
+  scale_x_continuous(limits = c(NA, 50), breaks = seq(20, 50, by = 5)) +
+  scale_y_continuous(limits = c(NA, NA), breaks = seq(30, 80, by = 5)) +
+  annotate("text", x = 45, y = 42, 
+    label = "r = 0,91",
+    size = 7, col = "grey30") +
+  theme(
+    legend.position = "none",
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    panel.grid.major = element_line(color = "gray90", linewidth = 0.3)
+  ) 
+#ggsave("egz8_vs_wykszt.png", dpi = 300, bg = "white", width = 7, height = 7)
+```
+
+To nie jest przypadek, że wykres wygląda bardzo podobne do poprzedniego: na podstawie wykształcenia jesteśmy w stanie z dobrą dokładnością przewidzieć średni wynik egzaminu.
+
+Oczywiście trzeba być tu ostrożnym z wnioskami, bo nie analizujemy wyników uczniów, w szczególności nie mamy informacji o wykształceniu ich rodziców, ale zbiorcze wyniki dla całego miasta (i swoją drogą, większe znacznie może mieć właśnie "wykształcenie miasta", a nie konkretnych rodziców). Oprócz tego takie przeciętne wykształcenie jest wypadkową wielu innych efektów i każdy z nich może mieć znaczenie.
+
+```{r}
+#| include: false
+m1 <- lm(Mat_matura ~ Mat_egz8, wyniki_wykszt) 
+summary(m1)
+m2 <- lm(Mat_matura ~ Mat_egz8 + Wykszt_wyższe, wyniki_wykszt) 
+summary(m2)
+
+df_wykszt <- df %>% 
+  drop_na(Mat_Mediana) %>% 
+  filter(Mat_N >= 10) %>% 
+  mutate(Kod = str_sub(Kod, 1, 6)) %>% 
+  left_join(wykszt, by = "Kod")
+lm(Mat_Mediana ~ Lokalizacja, df_wykszt) %>% summary()
+lm(Mat_Mediana ~ Lokalizacja + Wykszt_wyższe, df_wykszt) %>% summary()
+
+ggplot(df_wykszt, aes(Wykszt_wyższe, Mat_Mediana)) +
+  geom_point() +
+  geom_smooth() # związek liniowy
+```
+
+Na koniec spróbuję skorygować początkowy wykres z korelacją między wynikami egzaminu a wielkością miasta, uwzględniając przeciętne wykształcenie w danym mieście/gminie. Technicznie można to wykonać, modelując relację między medianą wyników egzaminu a wykształceniem (użyłem regresji liniowej, bo relacja jest w przybliżeniu liniowa), a następnie zestawić *reszty* z takiego modelu z wielkością miasta (do reszt dodaję średni wynik egzaminu, żeby zachować pierwotną skalę).
+
+```{r}
+m <- lm(Mat_Mediana ~ Wykszt_wyższe, df_wykszt)
+df_wykszt <- df_wykszt %>% 
+  mutate(Reszty = resid(m) + mean(df_wykszt$Mat_Mediana))
+
+df_wykszt %>% 
+  filter(Publiczność == "Publiczna") %>% 
+  filter(Lokalizacja %in% c("Miasto < 100 tys.", "Miasto > 500 tys.", "Wieś"),
+    Mat_N >= 10) %>%
+  ggplot(aes(Reszty, fill = Lokalizacja, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  labs(title = "Matematyka, szkoły publiczne, korekta na wykształcenie",
+    y = "Gęstość", x = "Mediana skorygowana [%]", fill = "",
+    caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Wieś" = "#0072B2",
+    "Miasto < 100 tys." = "#56B4E9", "Miasto > 500 tys." = "#009E73")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+Rozkłady są teraz znacznie bliżej siebie. Innymi słowy, tę ogromną różnicę na pierwotnym wykresie da się w dużej mierze "wyjaśnić" przeciętnym wykształceniem w gminie.
+
+Dodam, że ta korekta nie wpływa na różnice w wynikach między szkołami publicznymi i niepublicznymi. Tutaj potrzebne byłyby już indywidualne dane o wykształceniu.
+
+```{r}
+#| fig-height: 8
+
+df_wykszt %>% 
+  filter(Lokalizacja %in% c("Miasto < 100 tys.", "Miasto 100-500 tys.", 
+    "Miasto > 500 tys."), Mat_N >= 10) %>% 
+  mutate(Publiczność = fct_relevel(Publiczność, "Publiczna")) %>%
+  ggplot(aes(Reszty, fill = Publiczność, weight = Mat_N)) +
+  geom_density(alpha = 0.6, adjust = 1.2) +
+  facet_wrap(vars(Lokalizacja), ncol = 1) +
+  scale_x_continuous(breaks = seq(0, 100, by = 10), limits = c(0, 100)) +
+  labs(title = "Matematyka, korekta na wykształcenie",
+    y = "Gęstość", x = "Mediana skorygowana [%]",
+    fill = "Szkoła", caption = "Danetyka.com na podstawie danych CKE") +
+  scale_fill_manual(values = c("Publiczna" = "#999999", "Niepubliczna" = "#D55E00")) +
+  theme(
+    axis.line = element_blank(),
+    axis.ticks = element_blank(),
+    axis.text.y = element_blank(),
+    axis.title.y = element_blank()
+  )
+```
+
+Zależności z wykształceniem i wieloma innymi cechami zostały zbadanie znacznie obszerniej w [tej analizie](https://danetyka.com/egzamin-osmoklasisty/) (wyniki egzaminu ósmoklasisty z lat 2021-24). Co ciekawe, po uwzględnieniu wykształcenia przestaje mieć znaczenie np. mediana wynagrodzenia w gminie. 
+
+## Źródła
+
+* [Wyniki egzaminów](https://mapa.wyniki.edu.pl/MapaEgzaminow/)
+* [Informacje o szkołach, RSPO](https://rspo.gov.pl/zaawansowana)
+* [Wykształcenie, dane z NSP 2021](https://bdl.stat.gov.pl/bdl/dane/podgrup/temat)
+
+
+
+
+
